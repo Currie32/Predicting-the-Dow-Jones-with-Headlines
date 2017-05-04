@@ -9,3 +9,5 @@ For this project, we will use GloVe to create our word embeddings and CNNs follo
 --
 
 To view my work most easily, click on the .ipynb link.
+
+I wrote an article on Medium that explains some of the details of this project: [link](https://medium.com/@Currie32/predicting-the-stock-market-with-the-news-and-deep-learning-7fc8f5f639bc).
