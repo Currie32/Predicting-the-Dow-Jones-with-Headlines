@@ -9,7 +9,8 @@
 # 
 # For this project, we will use GloVe to create our word embeddings and CNNs followed by LSTMs to build our model. This model is based off the work done in this paper https://www.aclweb.org/anthology/C/C16/C16-1229.pdf.
 
-# In[333]:
+# In[1]:
+
 
 import pandas as pd
 import numpy as np
@@ -24,7 +25,7 @@ import matplotlib.pyplot as plt
 
 from keras.models import Sequential
 from keras import initializers
-from keras.layers import Dropout, Activation, Embedding, Convolution1D, MaxPooling1D, Input, Dense, Merge,                          BatchNormalization, Flatten, Reshape, Concatenate
+from keras.layers import Dropout, Activation, Embedding, Convolution1D, MaxPooling1D, Input, Dense,                          Add, BatchNormalization, Flatten, Reshape, Concatenate
 from keras.layers.recurrent import LSTM, GRU
 from keras.callbacks import Callback, ModelCheckpoint, EarlyStopping, ReduceLROnPlateau
 from keras.models import Model
@@ -32,7 +33,8 @@ from keras.optimizers import Adam, SGD, RMSprop
 from keras import regularizers
 
 
-# In[268]:
+# In[2]:
+
 
 dj = pd.read_csv("DowJones.csv")
 news = pd.read_csv("News.csv")
@@ -40,80 +42,93 @@ news = pd.read_csv("News.csv")
 
 # ## Inspect the data
 
-# In[269]:
+# In[3]:
+
 
 dj.head()
 
 
-# In[270]:
+# In[4]:
+
 
 dj.isnull().sum()
 
 
-# In[271]:
+# In[5]:
+
 
 news.isnull().sum()
 
 
-# In[272]:
+# In[6]:
+
 
 news.head()
 
 
-# In[273]:
+# In[7]:
+
 
 print(dj.shape)
 print(news.shape)
 
 
-# In[274]:
+# In[8]:
+
 
 # Compare the number of unique dates. We want matching values.
 print(len(set(dj.Date)))
 print(len(set(news.Date)))
 
 
-# In[275]:
+# In[9]:
+
 
 # Remove the extra dates that are in news
 news = news[news.Date.isin(dj.Date)]
 
 
-# In[276]:
+# In[10]:
+
 
 print(len(set(dj.Date)))
 print(len(set(news.Date)))
 
 
-# In[283]:
+# In[11]:
+
 
 # Calculate the difference in opening prices between the following and current day.
 # The model will try to predict how much the Open value will change beased on the news.
 dj = dj.set_index('Date').diff(periods=1)
 dj['Date'] = dj.index
-dj = dj1.reset_index(drop=True)
+dj = dj.reset_index(drop=True)
 # Remove unneeded features
 dj = dj.drop(['High','Low','Close','Volume','Adj Close'], 1)
 
 
-# In[284]:
+# In[12]:
+
 
 dj.head()
 
 
-# In[285]:
+# In[13]:
+
 
 # Remove top row since it has a null value.
 dj = dj[dj.Open.notnull()]
 
 
-# In[286]:
+# In[14]:
+
 
 # Check if there are any more null values.
 dj.isnull().sum()
 
 
-# In[287]:
+# In[15]:
+
 
 # Create a list of the opening prices and their corresponding daily headlines from the news
 price = []
@@ -132,22 +147,25 @@ for row in dj.iterrows():
         print(len(price))
 
 
-# In[288]:
+# In[16]:
+
 
 # Compare lengths to ensure they are the same
 print(len(price))
 print(len(headlines))
 
 
-# In[289]:
+# In[17]:
+
 
 # Compare the number of headlines for each day
 print(max(len(i) for i in headlines))
 print(min(len(i) for i in headlines))
-print(np.mean(len(i) for i in headlines))
+#print(np.mean(len(i) for i in headlines))
 
 
-# In[290]:
+# In[18]:
+
 
 # A list of contractions from http://stackoverflow.com/questions/19790188/expanding-english-language-contractions-in-python
 contractions = { 
@@ -227,7 +245,8 @@ contractions = {
 }
 
 
-# In[291]:
+# In[19]:
+
 
 def clean_text(text, remove_stopwords = True):
     '''Remove unwanted characters and format the text to create fewer nulls word embeddings'''
@@ -271,7 +290,15 @@ def clean_text(text, remove_stopwords = True):
     return text
 
 
-# In[292]:
+# In[20]:
+
+
+import nltk
+nltk.download('stopwords')
+
+
+# In[21]:
+
 
 # Clean the headlines
 clean_headlines = []
@@ -283,13 +310,15 @@ for daily_headlines in headlines:
     clean_headlines.append(clean_daily_headlines)
 
 
-# In[293]:
+# In[22]:
+
 
 # Take a look at some headlines to ensure everything was cleaned well
 clean_headlines[0]
 
 
-# In[294]:
+# In[23]:
+
 
 # Find the number of times each word was used and the size of the vocabulary
 word_counts = {}
@@ -305,11 +334,15 @@ for date in clean_headlines:
 print("Size of Vocabulary:", len(word_counts))
 
 
-# In[323]:
+# You have to download the glove.840B.300d.txt from here --> nlp.stanford.edu/data/glove.840B.300d.zip
+# Put the text file in the main directory
+
+# In[24]:
+
 
 # Load GloVe's embeddings
 embeddings_index = {}
-with open('/Users/Dave/Desktop/Programming/glove.840B.300d.txt', encoding='utf-8') as f:
+with open('glove.840B.300d.txt', encoding='utf-8') as f:
     for line in f:
         values = line.split(' ')
         word = values[0]
@@ -319,7 +352,8 @@ with open('/Users/Dave/Desktop/Programming/glove.840B.300d.txt', encoding='utf-8
 print('Word embeddings:', len(embeddings_index))
 
 
-# In[325]:
+# In[25]:
+
 
 # Find the number of words that are missing from GloVe, and are used more than our threshold.
 missing_words = 0
@@ -336,7 +370,8 @@ print("Number of words missing from GloVe:", missing_words)
 print("Percent of words that are missing from vocabulary: {}%".format(missing_ratio))
 
 
-# In[296]:
+# In[26]:
+
 
 # Limit the vocab that we will use to words that appear ≥ threshold or are in GloVe
 
@@ -368,7 +403,8 @@ print("Number of Words we will use:", len(vocab_to_int))
 print("Percent of Words we will use: {}%".format(usage_ratio))
 
 
-# In[297]:
+# In[27]:
+
 
 # Need to use 300 for embedding dimensions to match GloVe's vectors.
 embedding_dim = 300
@@ -391,7 +427,8 @@ print(len(word_embedding_matrix))
 
 # Note: The embeddings will be updated as the model trains, so our new 'random' embeddings will be more accurate by the end of training. This is also why we want to only use words that appear at least 10 times. By having the model see the word numerous timesm it will be better able to understand what it means. 
 
-# In[326]:
+# In[28]:
+
 
 # Change the text from words to integers
 # If word is not in vocab, replace it with <UNK> (unknown)
@@ -421,7 +458,8 @@ print("Total number of UNKs in headlines:", unk_count)
 print("Percent of words that are UNK: {}%".format(unk_percent))
 
 
-# In[300]:
+# In[29]:
+
 
 # Find the length of headlines
 lengths = []
@@ -433,12 +471,14 @@ for date in int_headlines:
 lengths = pd.DataFrame(lengths, columns=['counts'])
 
 
-# In[301]:
+# In[30]:
+
 
 lengths.describe()
 
 
-# In[303]:
+# In[31]:
+
 
 # Limit the length of a day's news to 200 words, and the length of any headline to 16 words.
 # These values are chosen to not have an excessively long training time and 
@@ -471,7 +511,8 @@ for date in int_headlines:
     pad_headlines.append(pad_daily_headlines)
 
 
-# In[304]:
+# In[32]:
+
 
 # Normalize opening prices (target values)
 max_price = max(price)
@@ -481,14 +522,16 @@ def normalize(price):
     return ((price-min_price)/(max_price-min_price))
 
 
-# In[305]:
+# In[33]:
+
 
 norm_price = []
 for p in price:
     norm_price.append(normalize(p))
 
 
-# In[306]:
+# In[34]:
+
 
 # Check that normalization worked well
 print(min(norm_price))
@@ -496,7 +539,8 @@ print(max(norm_price))
 print(np.mean(norm_price))
 
 
-# In[307]:
+# In[35]:
+
 
 # Split data into training and testing sets.
 # Validating data will be created during training.
@@ -508,14 +552,16 @@ y_train = np.array(y_train)
 y_test = np.array(y_test)
 
 
-# In[308]:
+# In[36]:
+
 
 # Check the lengths
 print(len(x_train))
 print(len(x_test))
 
 
-# In[310]:
+# In[37]:
+
 
 filter_length1 = 3
 filter_length2 = 5
@@ -593,27 +639,28 @@ def build_model():
     
     ####
 
-    model = Sequential()
+    # model = Sequential()
 
-    model.add(Merge([model1, model2], mode='concat'))
+    model = Add()([model1.output, model2.output])
     
-    model.add(Dense(hidden_dims, kernel_initializer=weights))
-    model.add(Dropout(dropout))
+    
+    model = Dense(hidden_dims, kernel_initializer=weights)(model)
+    model = Dropout(dropout)(model)
     
     if deeper == True:
-        model.add(Dense(hidden_dims//2, kernel_initializer=weights))
-        model.add(Dropout(dropout))
+        model = Dense(hidden_dims//2, kernel_initializer=weights)(model)
+        model = Dropout(dropout)(model)
 
-    model.add(Dense(1, 
-                    kernel_initializer = weights,
-                    name='output'))
+    model = Dense(1, kernel_initializer = weights, name='output')(model)
+    new_model = Model([model1.input, model2.input], model)
+    
+    new_model.compile(loss='mean_squared_error', optimizer=Adam(lr=learning_rate, clipvalue=1.0))
+    
+    return new_model
 
-    model.compile(loss='mean_squared_error',
-                  optimizer=Adam(lr=learning_rate,clipvalue=1.0))
-    return model
 
+# In[38]:
 
-# In[311]:
 
 # Use grid search to help find a better model
 for deeper in [False]:
@@ -642,7 +689,8 @@ for deeper in [False]:
                                     callbacks = callbacks)
 
 
-# In[312]:
+# In[40]:
+
 
 # Make predictions with the best weights
 deeper=False
@@ -657,13 +705,15 @@ model.load_weights('./question_pairs_weights_deeper={}_wider={}_lr={}_dropout={}
 predictions = model.predict([x_test,x_test], verbose = True)
 
 
-# In[313]:
+# In[41]:
+
 
 # Compare testing loss to training and validating loss
 mse(y_test, predictions)
 
 
-# In[314]:
+# In[42]:
+
 
 def unnormalize(price):
     '''Revert values to their unnormalized amounts'''
@@ -671,7 +721,8 @@ def unnormalize(price):
     return(price)
 
 
-# In[345]:
+# In[43]:
+
 
 unnorm_predictions = []
 for pred in predictions:
@@ -682,13 +733,15 @@ for y in y_test:
     unnorm_y_test.append(unnormalize(y))
 
 
-# In[346]:
+# In[44]:
+
 
 # Calculate the median absolute error for the predictions
 mae(unnorm_y_test, unnorm_predictions)
 
 
-# In[362]:
+# In[45]:
+
 
 print("Summary of actual opening price changes")
 print(pd.DataFrame(unnorm_y_test, columns=[""]).describe())
@@ -697,7 +750,8 @@ print("Summary of predicted opening price changes")
 print(pd.DataFrame(unnorm_predictions, columns=[""]).describe())
 
 
-# In[365]:
+# In[46]:
+
 
 # Plot the predicted (blue) and actual (green) values
 plt.figure(figsize=(12,4))
@@ -709,7 +763,8 @@ plt.ylabel("Change in Opening Price")
 plt.show()
 
 
-# In[318]:
+# In[47]:
+
 
 # Create lists to measure if opening price increased or decreased
 direction_pred = []
@@ -726,7 +781,8 @@ for value in unnorm_y_test:
         direction_test.append(0)
 
 
-# In[367]:
+# In[48]:
+
 
 # Calculate if the predicted direction matched the actual direction
 direction = acc(direction_test, direction_pred)
@@ -746,7 +802,8 @@ print("Predicted values matched the actual direction {}% of the time.".format(di
 
 # Below is the code necessary to make your own predictions. I found that the predictions are most accurate when there is no padding included in the input data. In the create_news variable, I have some default news that you can use, which is from April 30th, 2017. Just change the text to whatever you want, then see the impact your new headline will have.
 
-# In[117]:
+# In[49]:
+
 
 def news_to_int(news):
     '''Convert your created news into integers'''
@@ -759,7 +816,8 @@ def news_to_int(news):
     return ints
 
 
-# In[118]:
+# In[50]:
+
 
 def padding_news(news):
     '''Adjusts the length of your created news to fit the model's input values.'''
@@ -772,7 +830,8 @@ def padding_news(news):
     return padded_news
 
 
-# In[368]:
+# In[51]:
+
 
 # Default news that you can use
 create_news = "Leaked document reveals Facebook conducted research to target emotionally vulnerable and insecure youth.                Woman says note from Chinese 'prisoner' was hidden in new purse.                21,000 AT&T workers poised for Monday strike                housands march against Trump climate policies in D.C., across USA                Kentucky judge won't hear gay adoptions because it's not in the child's \"best interest\"                Multiple victims shot in UTC area apartment complex                Drones Lead Police to Illegal Dumping in Riverside County | NBC Southern California                An 86-year-old Californian woman has died trying to fight a man who was allegedly sexually assaulting her 61-year-old friend.                Fyre Festival Named in $5Million+ Lawsuit after Stranding Festival-Goers on Island with Little Food, No Security.                The \"Greatest Show on Earth\" folds its tent for good                U.S.-led fight on ISIS have killed 352 civilians: Pentagon                Woman offers undercover officer sex for $25 and some Chicken McNuggets                Ohio bridge refuses to fall down after three implosion attempts                Jersey Shore MIT grad dies in prank falling from library dome                New York graffiti artists claim McDonald's stole work for latest burger campaign                SpaceX to launch secretive satellite for U.S. intelligence agency                Severe Storms Leave a Trail of Death and Destruction Through the U.S.                Hamas thanks N. Korea for its support against ‘Israeli occupation’                Baker Police officer arrested for allegedly covering up details in shots fired investigation                Miami doctor’s call to broker during baby’s delivery leads to $33.8 million judgment                Minnesota man gets 15 years for shooting 5 Black Lives Matter protesters                South Australian woman facing possible 25 years in Colombian prison for drug trafficking                The Latest: Deal reached on funding government through Sept.                Russia flaunts Arctic expansion with new military bases"
